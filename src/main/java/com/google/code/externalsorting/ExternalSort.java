@@ -805,7 +805,10 @@ public class ExternalSort {
         public static Comparator<String> defaultcomparator = new Comparator<String>() {
                 @Override
                 public int compare(String r1, String r2) {
-                        return r1.compareTo(r2);
+                	r1 = (null == r1 ? "" : r1);
+                	r2 = (null == r2 ? "" : r2);
+                	
+                    return r1.compareTo(r2);
                 }
         };
 
