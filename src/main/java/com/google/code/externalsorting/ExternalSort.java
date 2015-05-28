@@ -17,6 +17,7 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.zip.Deflater;
@@ -240,34 +241,27 @@ public class ExternalSort {
                 final Comparator<String> cmp, boolean distinct,
                 List<BinaryFileBuffer> buffers, Reducer reducer) throws IOException {
         	
-                PriorityQueue<BinaryFileBuffer> pq = new PriorityQueue<BinaryFileBuffer>(
-                        11, new Comparator<BinaryFileBuffer>() {
-                                @Override
-                                public int compare(BinaryFileBuffer i,
-                                        BinaryFileBuffer j) {
-                                        return cmp.compare(i.peek(), j.peek());
-                                }
-                        });
-                for (BinaryFileBuffer bfb : buffers)
-                        if (!bfb.empty())
-                                pq.add(bfb);
-                int rowcounter = 0;
-                String lastLine = null;
-                try {
+        	PriorityQueue<BinaryFileBuffer> pq = new PriorityQueue<BinaryFileBuffer>(
+                    11, new Comparator<BinaryFileBuffer>() {
+                            @Override
+                            public int compare(BinaryFileBuffer i,
+                                    BinaryFileBuffer j) {
+                                    return cmp.compare(i.peek(), j.peek());
+                            }
+                    });
+            
+        	for (BinaryFileBuffer bfb : buffers)
+                    if (!bfb.empty())
+                            pq.add(bfb);
+            
+            int rowcounter = 0;
+            try {                        
+                    if(!distinct) {
                         while (pq.size() > 0) {
                                 BinaryFileBuffer bfb = pq.poll();
                                 String r = bfb.pop();
-                                // Skip duplicate lines
-                                int compare = cmp.compare(r, lastLine);
-								if (!distinct || compare != 0) {
-                                        fbw.write(r);
-                                        fbw.newLine();
-                                        lastLine = r;
-                                }
-								//call 
-                                else if(compare == 0 && reducer != null) {
-                                	lastLine = reducer.merge(lastLine, r);
-                                }
+                                fbw.write(r);
+                                fbw.newLine();
                                 ++rowcounter;
                                 if (bfb.empty()) {
                                         bfb.fbr.close();
@@ -275,12 +269,50 @@ public class ExternalSort {
                                         pq.add(bfb); // add it back
                                 }
                         }
-                } finally {
-                        fbw.close();
-                        for (BinaryFileBuffer bfb : pq)
-                                bfb.close();
-                }
-                return rowcounter;
+                    } else {    
+                        String lastLine = null;
+                        if(pq.size() > 0) {
+                 			BinaryFileBuffer bfb = pq.poll();
+                 			lastLine = bfb.pop();
+                 			fbw.write(lastLine);
+                 			fbw.newLine();
+                 			++rowcounter;
+                 			if (bfb.empty()) {
+                 				bfb.fbr.close();
+                 			} else {
+                 				pq.add(bfb); // add it back
+                 			}                			
+                 		}
+                        while (pq.size() > 0) {
+                			BinaryFileBuffer bfb = pq.poll();
+                			String r = bfb.pop();
+                			// Skip duplicate lines
+                			int compare = cmp.compare(r, lastLine);
+							if  (compare != 0) {
+                				fbw.write(r);
+                				fbw.newLine();
+                				lastLine = r;
+                			}
+							else if(reducer != null) {
+								String reduced = reducer.merge(lastLine, r);
+                				lastLine = reduced != null ? reduced : lastLine;
+							}
+							
+                			++rowcounter;
+                			if (bfb.empty()) {
+                				bfb.fbr.close();
+                			} else {
+                				pq.add(bfb); // add it back
+                			}
+                        }
+                    }
+            } finally {
+                    fbw.close();
+                    for (BinaryFileBuffer bfb : pq)
+                            bfb.close();
+            }
+            return rowcounter;
+
 
         }
 
@@ -522,39 +554,91 @@ public class ExternalSort {
          * @param usegzip
          *                set to true if you are using gzip compression for the
          *                temporary files
+         *                
          * @throws IOException
          */
         public static File sortAndSave(List<String> tmplist,
                 Comparator<String> cmp, Charset cs, File tmpdirectory,
                 boolean distinct, boolean usegzip) throws IOException {
-                Collections.sort(tmplist, cmp);
-                File newtmpfile = File.createTempFile("sortInBatch",
-                        "flatfile", tmpdirectory);
-                newtmpfile.deleteOnExit();
-                OutputStream out = new FileOutputStream(newtmpfile);
-                int ZIPBUFFERSIZE = 2048;
-                if (usegzip)
-                        out = new GZIPOutputStream(out, ZIPBUFFERSIZE) {
-                                {
-                                        this.def.setLevel(Deflater.BEST_SPEED);
-                                }
-                        };
-                BufferedWriter fbw = new BufferedWriter(new OutputStreamWriter(
-                        out, cs));
-                String lastLine = null;
-                try {
+        	return sortAndSave(tmplist, cmp, cs, tmpdirectory, distinct, usegzip, null);
+        }
+        
+        /**
+         * Sort a list and save it to a temporary file
+         * 
+         * @return the file containing the sorted data
+         * @param tmplist
+         *                data to be sorted
+         * @param cmp
+         *                string comparator
+         * @param cs
+         *                charset to use for output (can use
+         *                Charset.defaultCharset())
+         * @param tmpdirectory
+         *                location of the temporary files (set to null for
+         *                default location)
+         * @param distinct
+         *                Pass <code>true</code> if duplicate lines should be
+         *                discarded.
+         * @param usegzip
+         *                set to true if you are using gzip compression for the
+         *                temporary files
+         *                
+         * @param reducer
+         * 				  reduces equal lines
+         *                
+         * @throws IOException
+         */
+        public static File sortAndSave(List<String> tmplist,
+                Comparator<String> cmp, Charset cs, File tmpdirectory,
+                boolean distinct, boolean usegzip, Reducer reducer) throws IOException {
+        	
+        	Collections.sort(tmplist, cmp);// In Java8, we can do tmplist = tmplist.parallelStream().sorted(cmp).collect(Collectors.toCollection(ArrayList<String>::new));
+            File newtmpfile = File.createTempFile("sortInBatch",
+                    "flatfile", tmpdirectory);
+            newtmpfile.deleteOnExit();
+            OutputStream out = new FileOutputStream(newtmpfile);
+            int ZIPBUFFERSIZE = 2048;
+            if (usegzip)
+                    out = new GZIPOutputStream(out, ZIPBUFFERSIZE) {
+                            {
+                                    this.def.setLevel(Deflater.BEST_SPEED);
+                            }
+                    };
+            BufferedWriter fbw = new BufferedWriter(new OutputStreamWriter(
+                    out, cs));
+            try {
+                    if (!distinct) {
                         for (String r : tmplist) {
-                                // Skip duplicate lines
-                                if (!distinct || cmp.compare(r, lastLine) != 0) {
-                                        fbw.write(r);
-                                        fbw.newLine();
-                                        lastLine = r;
-                                }
+                                    fbw.write(r);
+                                    fbw.newLine();
                         }
-                } finally {
-                        fbw.close();
-                }
-                return newtmpfile;
+                    } else {
+                		String lastLine = null;
+                		Iterator<String> i = tmplist.iterator();
+                		if(i.hasNext()) {
+                			lastLine = i.next();
+                			fbw.write(lastLine);
+              				fbw.newLine();
+                		}
+                		while (i.hasNext()) {
+                			String r = i.next();
+                			// Skip duplicate lines
+                			if (cmp.compare(r, lastLine) != 0) {
+                				fbw.write(r);
+                				fbw.newLine();
+                				lastLine = r;
+                			}
+                			else if(reducer != null) {
+                				String reduced = reducer.merge(lastLine, r);
+                				lastLine = reduced != null ? reduced : lastLine;
+                			}
+                		}
+                    }
+            } finally {
+                    fbw.close();
+            }
+            return newtmpfile;
         }
 
         /**
