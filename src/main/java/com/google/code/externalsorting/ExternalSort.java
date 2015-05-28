@@ -684,6 +684,16 @@ public class ExternalSort {
                         estimateAvailableMemory(), Charset.defaultCharset(),
                         null, distinct, 0, false);
         }
+        
+        public static List<File> sortInBatch(final BufferedReader fbr,
+                final long datalength, final Comparator<String> cmp,
+                final int maxtmpfiles, long maxMemory, final Charset cs,
+                final File tmpdirectory, final boolean distinct,
+                final int numHeader, final boolean usegzip) throws IOException {
+        	
+        	return sortInBatch(fbr, datalength, cmp, maxtmpfiles, maxMemory, cs,
+                    tmpdirectory, distinct, numHeader, usegzip, null);
+        }
 
         /**
          * @param fbr
@@ -716,7 +726,7 @@ public class ExternalSort {
                 final long datalength, final Comparator<String> cmp,
                 final int maxtmpfiles, long maxMemory, final Charset cs,
                 final File tmpdirectory, final boolean distinct,
-                final int numHeader, final boolean usegzip) throws IOException {
+                final int numHeader, final boolean usegzip, Reducer reducer) throws IOException {
                 List<File> files = new ArrayList<File>();
                 long blocksize = estimateBestSizeOfBlocks(datalength,
                         maxtmpfiles, maxMemory);// in
@@ -742,13 +752,13 @@ public class ExternalSort {
                                                         .estimatedSizeOf(line);
                                         }
                                         files.add(sortAndSave(tmplist, cmp, cs,
-                                                tmpdirectory, distinct, usegzip));
+                                                tmpdirectory, distinct, usegzip, reducer));
                                         tmplist.clear();
                                 }
                         } catch (EOFException oef) {
                                 if (tmplist.size() > 0) {
                                         files.add(sortAndSave(tmplist, cmp, cs,
-                                                tmpdirectory, distinct, usegzip));
+                                                tmpdirectory, distinct, usegzip, reducer));
                                         tmplist.clear();
                                 }
                         }
