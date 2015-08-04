@@ -444,7 +444,6 @@ public class ExternalSort {
                 
                 if(header != null) {
                 	fbw.append(header);
-                	fbw.newLine();
                 }
                 
                 int rowcounter = mergeSortedFiles(fbw, cmp, distinct, bfbs);
