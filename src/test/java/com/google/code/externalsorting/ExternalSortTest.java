@@ -189,7 +189,7 @@ public class ExternalSortTest {
         File out = File.createTempFile("test_results", ".tmp", null);
         writeStringToFile(out, "HEADER, HEADER\n");
 
-        ExternalSort.mergeSortedFiles(this.fileList, out, cmp, Charset.defaultCharset(), true, true, false);
+        ExternalSort.mergeSortedFiles(this.fileList, out, cmp, Charset.defaultCharset(), true, true, false, null);
 
         bf = new BufferedReader(new FileReader(out));
 
@@ -322,7 +322,7 @@ public class ExternalSortTest {
         	List<File> listOfFiles = ExternalSort.sortInBatch(this.csvFile, cmp, ExternalSort.DEFAULTMAXTEMPFILES, Charset.defaultCharset(), null, false, 1, usegzip);
         	
         	// now merge with append 
-        	ExternalSort.mergeSortedFiles(listOfFiles, out, cmp, Charset.defaultCharset(), false, true, usegzip);
+        	ExternalSort.mergeSortedFiles(listOfFiles, out, cmp, Charset.defaultCharset(), false, true, usegzip, null);
         	
         	ArrayList<String> result = readLines(out);
         	

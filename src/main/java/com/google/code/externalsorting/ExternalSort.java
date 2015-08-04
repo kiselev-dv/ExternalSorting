@@ -191,7 +191,7 @@ public class ExternalSort {
                         System.out
                                 .println("created " + l.size() + " tmp files");
                 mergeSortedFiles(l, new File(outputfile), comparator, cs,
-                        distinct, false, usegzip);
+                        distinct, false, usegzip, null);
         }
 
         /**
@@ -404,7 +404,7 @@ public class ExternalSort {
                 final Comparator<String> cmp, Charset cs, boolean distinct)
                 throws IOException {
                 return mergeSortedFiles(files, outputfile, cmp, cs, distinct,
-                        false, false);
+                        false, false, null);
         }
 
         /**
@@ -435,12 +435,18 @@ public class ExternalSort {
          */
         public static int mergeSortedFiles(List<File> files, File outputfile,
                 final Comparator<String> cmp, Charset cs, boolean distinct,
-                boolean append, boolean usegzip) throws IOException {
+                boolean append, boolean usegzip, String header) throws IOException {
                 
         		ArrayList<BinaryFileBuffer> bfbs = getBFBs(files, cs, usegzip);
                 
                 BufferedWriter fbw = new BufferedWriter(new OutputStreamWriter(
                         new FileOutputStream(outputfile, append), cs));
+                
+                if(header != null) {
+                	fbw.append(header);
+                	fbw.newLine();
+                }
+                
                 int rowcounter = mergeSortedFiles(fbw, cmp, distinct, bfbs);
                 for (File f : files)
                         f.delete();
