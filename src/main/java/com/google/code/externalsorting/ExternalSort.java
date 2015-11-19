@@ -429,6 +429,8 @@ public class ExternalSort {
          *                for overloading methods.
          * @param usegzip
          *                assumes we used gzip compression for temporary files
+         * @param header
+         * 				  add header line to result file               
          * @return The number of lines sorted. (P. Beaudoin)
          * @throws IOException
          * @since v0.1.4
@@ -477,6 +479,27 @@ public class ExternalSort {
 			return bfbs;
 		}
 
+		/**
+         * This merges a bunch of temporary flat files
+         * 
+         * @param files
+         *                The {@link List} of sorted {@link File}s to be merged.
+         * @param fbw
+         *                Result writer               
+         * @param distinct
+         *                Pass <code>true</code> if duplicate lines should be
+         *                discarded. (elchetz@gmail.com)
+         * @param cmp
+         *                The {@link Comparator} to use to compare
+         *                {@link String}s.
+         * @param cs
+         *                The {@link Charset} to be used for the byte to
+         *                character conversion.
+         * @param usegzip
+         *                assumes we used gzip compression for temporary files
+         * @return The number of lines sorted.
+         * @throws IOException
+         */
 		public static int mergeSortedFiles(List<File> files, BufferedWriter fbw,
 				final Comparator<String> cmp, Charset cs, boolean distinct,
 				boolean usegzip) throws IOException {
@@ -485,6 +508,29 @@ public class ExternalSort {
 					
 		}
         
+		/**
+         * This merges a bunch of temporary flat files
+         * 
+         * @param files
+         *                The {@link List} of sorted {@link File}s to be merged.
+         * @param fbw
+         *                Result writer               
+         * @param distinct
+         *                Pass <code>true</code> if duplicate lines should be
+         *                discarded. (elchetz@gmail.com)
+         * @param cmp
+         *                The {@link Comparator} to use to compare
+         *                {@link String}s.
+         * @param cs
+         *                The {@link Charset} to be used for the byte to
+         *                character conversion.
+         * @param usegzip
+         *                assumes we used gzip compression for temporary files
+         * @param reducer
+         *                interface for merge equal lines               
+         * @return The number of lines sorted. (P. Beaudoin)
+         * @throws IOException
+         */
         public static int mergeSortedFiles(List<File> files, BufferedWriter fbw,
                 final Comparator<String> cmp, Charset cs, boolean distinct,
                 boolean usegzip, Reducer reducer) throws IOException {
@@ -690,6 +736,34 @@ public class ExternalSort {
                         null, distinct, 0, false);
         }
         
+        /**
+         * This will simply load the file by blocks of lines, then sort them
+         * in-memory, and write the result to temporary files that have to be
+         * merged later.
+         * 
+         * @param fbr
+         *                data source
+         * @param datalength
+         *                estimated data volume (in bytes)
+         * @param cmp
+         *                string comparator
+         * @param maxtmpfiles
+         *                how many tmp files to use
+         * @param maxMemory
+         *                how many ram to use for one file
+         * @param cs
+         * 				  CharSet
+         * @param tmpdirectory
+         *                temp directory for files
+         * @param numHeader
+         * @param usegzip               
+         *                gzip tmp files                                                            
+         * @param distinct
+         *                Pass <code>true</code> if duplicate lines should be
+         *                discarded.
+         * @return a list of temporary flat files
+         * @throws IOException
+         */
         public static List<File> sortInBatch(final BufferedReader fbr,
                 final long datalength, final Comparator<String> cmp,
                 final int maxtmpfiles, long maxMemory, final Charset cs,
@@ -724,6 +798,9 @@ public class ExternalSort {
          *                number of lines to preclude before sorting starts
          * @param usegzip
          *                use gzip compression for the temporary files
+         * @param reducer
+         *                allows to modify lines which was matched as equals
+         *                by Comparator cmp                
          * @return a list of temporary flat files
          * @throws IOException
          */
